@@ -1,0 +1,63 @@
+imports:
+- path: cloudsql-instance.py
+- path: cloudsql-database.py
+- path: forseti-instance.py
+- path: service_acct.py
+- path: bucket.py
+
+resources:
+
+# Cloud SQL
+- name: cloudsql-instance
+  type: cloudsql-instance.py
+  properties:
+    region: us-central1
+    instance-name: forseti-sql-instance
+
+- name: forseti_security
+  type: cloudsql-database.py
+
+# Cloud Storage
+- name: {{ env["project"] }}
+  type: bucket.py
+  properties:
+    location: us
+
+# Compute Engine
+- name: forseti-instance
+  type: forseti-instance.py
+  properties:
+    image-project: ubuntu-os-cloud
+    image-family: ubuntu-1604-lts
+    instance-type: n1-standard-2
+    region: $(ref.cloudsql-instance.region)
+    zone: $(ref.cloudsql-instance.region)-c
+
+    service-account: $(ref.forseti-gcp-reader.email)
+    service-account-scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+    scanner-bucket: SCANNER_BUCKET
+    database-name: forseti_security
+    network-host-project-id: {{ env["project"] }}
+    vpc-name: default
+    subnetwork-name: default
+
+    branch-name: "master"
+    src-path: https://github.com/GoogleCloudPlatform/forseti-security
+
+    # Cloud SQL
+    cloudsqlproxy-os-arch: linux.amd64
+    db-port: 3306
+
+# Service accounts
+- name: forseti-gcp-reader
+  type: service_acct.py
+  properties:
+    accountId: forseti-gcp-reader
+    displayName: forseti-gcp-reader
+
+- name: forseti-gsuite-reader
+  type: service_acct.py
+  properties:
+    accountId: forseti-gsuite-reader
+    displayName: forseti-gsuite-reader
